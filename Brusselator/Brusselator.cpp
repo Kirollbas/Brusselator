@@ -1,6 +1,7 @@
 #include <SFML\Graphics.hpp>
 #include <iostream>
 #include <cmath>
+#include <string>
 
 
 
@@ -70,8 +71,8 @@ int main(){
         for (int j = 0; j < height + 2; j++)
         {
             x_data[i * (width + 2) + j] = new double[2];
-            x_data[i * (width + 2) + j][0] = rand() % 2;
-            x_data[i * (width + 2) + j][1] = rand() % 2; 
+            x_data[i * (width + 2) + j][0] = (rand() % 5) * (rand() % 2) * (rand() % 2);
+            x_data[i * (width + 2) + j][1] = (rand() % 5) * (rand() % 2) * (rand() % 2); 
         }
         
     }
@@ -80,8 +81,8 @@ int main(){
     for (int w = 1; w <= width; w++){
 
         for (int h = 1; h <= height; h++){
-            x_data[w * (width + 2) + h][0] = 0 + rand() % 5; //X
-            x_data[w * (width + 2) + h][1] = 0 + rand() % 5; //Y
+            x_data[w * (width + 2) + h][0] = rand() % 5; //X
+            x_data[w * (width + 2) + h][1] = rand() % 5; //Y
         }
     }
 
@@ -94,8 +95,8 @@ int main(){
     k_data[3] = 1; //k4
     k_data[4] = 1; //A
     k_data[5] = 3; //B
-    k_data[6] = 0.3; // velocity of X diffusion 
-    k_data[7] = 0.03; // velocity of Y diffusion 
+    k_data[6] = 0.2; // velocity of X diffusion 
+    k_data[7] = 0.02; // velocity of Y diffusion 
 
     //hop
     double hop = 0.05;
@@ -105,6 +106,7 @@ int main(){
 
     //current time
     double current_time = 0;
+    int iterations = 0;
 
     // buthcer's table of euler method 
     int euler_steps = 1;
@@ -115,10 +117,11 @@ int main(){
 
 
 
-
+    // sqare size
     int pixel_size_x = 5;
     int pixel_size_y = 5;
 
+    // squares array
     std::vector<std::vector<sf::RectangleShape>> rectangle_shapes;
     rectangle_shapes.resize(width);
 
@@ -131,11 +134,19 @@ int main(){
         }
     }
     
+    //text of counters;
+    sf::Font font;
+    font.loadFromFile("calibri_bold.ttf");
+    sf::Text counters;
+    counters.setFont(font);
+    counters.setFillColor(sf::Color(0,255,255));
+    counters.setPosition(0, pixel_size_y * height + 5);
+    std::string counters_text;
 
     //Brusselator window
 
-    sf::RenderWindow window(sf::VideoMode(pixel_size_x * width, pixel_size_y * height), "Brusselator");
-    window.setFramerateLimit(60);
+    sf::RenderWindow window(sf::VideoMode(pixel_size_x * width, pixel_size_y * height + 40), "Brusselator");
+    window.setFramerateLimit(45);
 
     while (window.isOpen())
     {
@@ -161,7 +172,12 @@ int main(){
             }
         }
         current_time += hop;
-        std::cout << current_time << '\n';
+        iterations += 1;
+
+        counters_text = "Time: " + std::to_string(current_time) + "   Iterations: " + std::to_string(iterations);
+        counters.setString(counters_text);
+
+        window.draw(counters);
         
         window.display();
     }
