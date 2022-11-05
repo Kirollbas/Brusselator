@@ -6,14 +6,15 @@
 #define WIDTH 100
 #define HEIGHT 100
 #define VECTOR_DIM 2
+#define STEPS 5
 
-#define CURRENT_X(i,j,n)    2 * (i * (WIDTH + 2) + j) + n
-#define LEFT_X(i,j,n)       2 * (i * (WIDTH + 2) + (j - 1)) + n
-#define RIGHT_X(i,j,n)      2 * (i * (WIDTH + 2) + (j + 1)) + n
-#define UP_X(i,j,n)         2 * ((i - 1) * (WIDTH + 2) + j) + n
-#define DOWN_X(i,j,n)       2 * ((i + 1) * (WIDTH + 2) + j) + n
-#define CURRENT_FX(i,j,n)   2 * ((i - 1) * WIDTH + (j - 1)) + n
-
+#define CURRENT_X(i,j,n)        (2 * (i * (WIDTH + 2) + j) + n)
+#define LEFT_X(i,j,n)           (2 * (i * (WIDTH + 2) + (j - 1)) + n)
+#define RIGHT_X(i,j,n)          (2 * (i * (WIDTH + 2) + (j + 1)) + n)
+#define UP_X(i,j,n)             (2 * ((i - 1) * (WIDTH + 2) + j) + n)
+#define DOWN_X(i,j,n)           (2 * ((i + 1) * (WIDTH + 2) + j) + n)
+#define CURRENT_FX(i,j,n)       (2 * ((i - 1) * WIDTH + (j - 1)) + n)
+#define FX_LAYER(s)             (s * WIDTH * HEIGHT * 2)
 
 struct Brusselator_data
 {
@@ -21,17 +22,20 @@ public:
     double* x_data;
     double* fx_data;
     double* k_data;
+    double* tmp_x_data;
 
     Brusselator_data(){
         x_data = new double[(WIDTH + 2) * (HEIGHT + 2) * VECTOR_DIM];
-        fx_data = new double[WIDTH * HEIGHT * VECTOR_DIM];
+        fx_data = new double[WIDTH * HEIGHT * VECTOR_DIM * STEPS];
         k_data = new double[8];
+        tmp_x_data = new double[(WIDTH + 2) * (HEIGHT + 2) * VECTOR_DIM];
     }
 
     ~Brusselator_data(){
         delete[] x_data;
         delete[] fx_data;
         delete[] k_data;
+        delete[] tmp_x_data;
     }
 };
 
@@ -56,26 +60,61 @@ void Brusselator(double* x_data , double* fx_data, double* k_data){
     }
 };
 
+void common_runge_kutta_method(Brusselator_data& data, int vec_dim, void(*RS_function)(double*, double*, double*), double hop, int steps, double* butcher_table){
+    for (int s = 0; s < steps; s++)
+    {   
 
-void euler_method(double* x_data, int vec_dim, double* fx_data, double* k_data, void(*RS_function)(double*, double*, double*), double hop){
-    RS_function(x_data,fx_data,k_data);
-
-
-    for (size_t i = 1; i <= HEIGHT; i++)
-    {
-        for (size_t j = 1; j <= WIDTH; j++)
+        for (size_t i = 0; i < HEIGHT + 2; i++)
         {
-            for (size_t n = 0; n < vec_dim; n++)
+            for (size_t j = 0; j < WIDTH + 2; j++)
             {
-                x_data[CURRENT_X(i,j,n)] += hop * fx_data[CURRENT_FX(i,j,n)];
-            }
+                for (size_t n = 0; n < vec_dim; n++)
+                {
+                    data.tmp_x_data[CURRENT_X(i,j,n)] = data.x_data[CURRENT_X(i,j,n)];
+                }
             
-        }
+            }
         
+        }
+
+        for (int column = 0; column < s; column++)
+        {
+            for (size_t i = 1; i <= HEIGHT; i++)
+            {
+                for (size_t j = 1; j <= WIDTH; j++)
+                {
+                    for (size_t n = 0; n < vec_dim; n++)
+                    {
+                        data.tmp_x_data[CURRENT_X(i,j,n)] += hop * butcher_table[s * steps + column] * data.fx_data[FX_LAYER(column) + CURRENT_FX(i,j,n)];
+                    }
+            
+                }
+        
+            }
+        }
+
+        RS_function(data.tmp_x_data, data.fx_data + FX_LAYER(s), data.k_data);
+
     }
 
+    for (int s = 0; s < steps; s++)
+    {
+        for (size_t i = 1; i <= HEIGHT; i++)
+        {
+            for (size_t j = 1; j <= WIDTH; j++)
+            {
+                for (size_t n = 0; n < vec_dim; n++)
+                {
+                    
+                    data.x_data[CURRENT_X(i,j,n)] += hop * butcher_table[steps * steps + s] * data.fx_data[(FX_LAYER(s) + CURRENT_FX(i,j,n))];
+                }
+        
+            }
     
-};
+        }
+    }
+    
+}
 
 int main(){
 
@@ -111,6 +150,16 @@ int main(){
     data.k_data[5] = 3; //B
     data.k_data[6] = 0.3; // velocity of X diffusion 
     data.k_data[7] = 0.03; // velocity of Y diffusion 
+
+    // euler butchers table
+    int euler_steps = 1;
+    double euler_table[] = {0,1};
+
+    //RK4 butcher table
+    int RK4_steps = 4;
+    double RK4_table[] = {0,0,0,0, (1./2),0,0,0, 0,(1./2),0,0, 0,0,1,0, (1./6),(1./3),(1./3),(1./6)};
+
+
 
     //hop
     double hop = 0.05;
@@ -161,7 +210,7 @@ int main(){
 
         window.clear();
 
-        euler_method(data.x_data,VECTOR_DIM,data.fx_data,data.k_data,Brusselator,hop);
+        common_runge_kutta_method(data,VECTOR_DIM,Brusselator,hop,RK4_steps,RK4_table);
         
         for (size_t i = 1; i <= HEIGHT; i++)
         {
